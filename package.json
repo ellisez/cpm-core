@@ -1,0 +1,38 @@
+{
+  "bin": {
+    "h5": "./bin/h5.js",
+    "wx": "./bin/wx.js",
+    "android": "./bin/android.js",
+    "ios": "./bin/ios.js"
+  },
+  "bundleDependencies": false,
+  "dependencies": {
+    "@types/jest": "^24.0.11",
+    "@vue/cli-plugin-babel": "^4.0.0",
+    "@vue/cli-plugin-e2e-nightwatch": "^4.0.0",
+    "@vue/cli-plugin-eslint": "^4.0.0",
+    "@vue/cli-plugin-pwa": "^4.0.0",
+    "@vue/cli-plugin-router": "^4.0.0",
+    "@vue/cli-plugin-typescript": "^4.0.0",
+    "@vue/cli-plugin-unit-jest": "^4.0.0",
+    "@vue/cli-plugin-vuex": "^4.0.0",
+    "@vue/cli-service": "^4.0.0",
+    "@vue/eslint-config-standard": "^4.0.0",
+    "@vue/eslint-config-typescript": "^4.0.0",
+    "@vue/test-utils": "1.0.0-beta.29",
+    "canvas": "^2.5.0",
+    "chromedriver": "78",
+    "eslint": "^5.16.0",
+    "eslint-plugin-vue": "^5.0.0",
+    "geckodriver": "^1.19.0",
+    "less": "^3.0.4",
+    "less-loader": "^5.0.0",
+    "selenium-server": "^3.141.59",
+    "typescript": "~3.5.3",
+    "vue-template-compiler": "^2.6.10"
+  },
+  "deprecated": false,
+  "description": "cpm base platform for advanced platform using. h5,android,ios etc.",
+  "name": "@cpm/core",
+  "version": "1.0.0"
+}
