@@ -5,17 +5,15 @@ const platform=require('../lib/platform');
 
 const cwd=process.cwd();
 
-const cpm_platform=path.basename(__filename, '.js');
-process.env.CPM_PLATFORM=cpm_platform;
+const nativeType=path.basename(__filename, '.js');
+process.env.CPM_NATIVE_TYPE=nativeType;
 
-const nativePath=path.resolve(cwd, 'native', cpm_platform);
+const nativeDirector=path.resolve(cwd, 'native', nativeType);
 if (!fs.existsSync(nativePath)) {
-  console.error(`${cpm_platform} are not installed!\ntry to add platform ${cpm_platform} to "package.json".\ntry to "cpm build".`);
+  console.error(`${nativeType} are not installed!\ntry to add platform ${nativeType} to "package.json".\ntry to "cpm build".`);
   return;
 }
-process.env.CPM_NATIVE_PATH=nativePath;
-
-process.env.VUE_CLI_SERVICE_CONFIG_PATH=path.join(__dirname, '../vue.config.js');
+process.env.CPM_NATIVE_DIRECTOR=nativeDirector;
 
 // npm run (?<platform>) (build|serve)
 const commandArgs=process.argv.slice(2);

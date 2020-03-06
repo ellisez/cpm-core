@@ -1,94 +1,72 @@
-const platform=process.env.CPM_PLATFORM;
-if (!platform) {
-  console.error(`Not specified platform!`);
-  return;
+function hasMultipleCores () {
+  try {
+    return require('os').cpus().length > 1
+  } catch (e) {
+    return false
+  }
 }
 
-const nativePath=process.env.CPM_NATIVE_PATH;
-const path=require('path');
-const fs=require('fs');
-const defaultsDeep = require('lodash.defaultsdeep')
-
-const sourcePath=path.join(nativePath, '../../');
-
-let entry=path.join(sourcePath, './src/main.js');
-if (!fs.existsSync(entry)) {
-  entry=path.join(sourcePath, './src/main.ts');
-}
-
-const outputDir=path.join(nativePath, './dist');
-
-const template = path.join(nativePath, './public/index.html');
-
-const defaultConfig = {
-  outputDir,
-  productionSourceMap: true,
+module.exports={
+  publicPath: '/',
+  outputDir: 'dist',
   pages: {
-    index: {
-      entry,
-      template,
+    app: {
+      entry: './src/main.js',
+      filename: '[name].[contenthash:8].js'
     }
   },
-  chainWebpack(config) {
-    config.resolve.modules
-      .add(path.join(nativePath, './node_modules'))
-      //.add(path.join(sourcePath, './node_modules'))
-      .add(path.join(sourcePath, './node_modules/@cpm/core/node_modules'))
-      .add(path.join(sourcePath, './node_modules/@cpm/runtime/node_modules'))
-    // config.resolve.extensions
-    //   .add('.js').add('.vue').add('.json')
-    config.resolve.alias
-      //.set('vue$', 'vue/dist/vue.esm.js')
-      .set('@', path.join(sourcePath, './src'))
-      .set('#', path.join(nativePath, './src'))
 
-    // copy static assets in public/
-    const publicCopyIgnore = ['.DS_Store'];
-    const nativePublic = path.join(nativePath, './public');
-    if (template.startsWith(nativePublic)) {
-      publicCopyIgnore.push(path.relative(nativePublic, template));
-    }
-    config
-      .plugin('nativeCopy')
-      .use(require('copy-webpack-plugin'), [[{
-        from: nativePublic,
-        to: outputDir,
-        toType: 'dir',
-        ignore: publicCopyIgnore
-      }]])
+  // where to put static assets (js/css/img/font/...)
+  assetsDir: '',
+
+  // filename for index.html (relative to outputDir)
+  indexPath: 'index.html',
+
+  // whether filename will contain hash part
+  filenameHashing: true,
+
+  // boolean, use full build?
+  runtimeCompiler: false,
+
+  // deps to transpile
+  transpileDependencies: [
+    /* string or regex */
+  ],
+
+  // sourceMap for production build?
+  productionSourceMap: !process.env.VUE_CLI_TEST,
+
+  // use thread-loader for babel & TS in production build
+  // enabled by default if the machine has more than 1 cores
+  parallel: hasMultipleCores(),
+
+
+  // <script type="module" crossorigin="use-credentials">
+  // #1656, #1867, #2025
+  crossorigin: undefined,
+
+  // subresource integrity
+  integrity: false,
+
+  css: {
+    // extract: true,
+    // modules: false,
+    // sourceMap: false,
+    // loaderOptions: {}
+  },
+
+  // whether to use eslint-loader
+  lintOnSave: 'default',
+
+  devServer: {
+    /*
+    open: process.platform === 'darwin',
+    host: '0.0.0.0',
+    port: 8080,
+    https: false,
+    hotOnly: false,
+    proxy: null, // string | Object
+    before: app => {}
+  */
   }
-};
-
-let nativeConfig;
-const nativeConfigPath=path.join(nativePath, 'vue.config.js');
-if (fs.existsSync(nativeConfigPath)) {
-  nativeConfig=require(nativeConfigPath);
-  nativeConfig=recureNativeConfig(nativeConfig);
 }
-
-let config=defaultConfig;
-if (nativeConfig) {
-  config=defaultsDeep(nativeConfig, defaultConfig);
-}
-
-function recureNativeConfig(object) {
-  if (object instanceof Array) {
-    for (let i=0; i<object.length; i++) {
-      let item=object[i];
-      object[i]=recureNativeConfig(item);
-    }
-  } else if (typeof(object)=='object'){
-    for (let key in object) {
-      let value=object[key];
-      object[key]=recureNativeConfig(value);
-    }
-  } else if (typeof(object)=='string') {
-    if (/^(\.\.|\.)/g.test(object)) {
-      return path.join(nativePath, object);
-    }
-  }
-
-  return object;
-}
-
-module.exports=config;
