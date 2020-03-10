@@ -1,4 +1,4 @@
-const fs = require('fs');
+const fs = require('fs-extra');
 const path = require('path');
 const merge = require('webpack-merge')
 const Config = require('webpack-chain');
@@ -12,13 +12,64 @@ const webpackConfigFunctions=[];
 let vueConfig={};
 let webpackConfig={};
 
+const utils={
+	mergeVueConfig(vueConfig, config) {
+    	if (config.chainWebpack) {
+        	webpackChainFunctions.push(config.chainWebpack);
+        	delete config.chainWebpack;
+    	}
+    	if (config.configureWebpack) {
+        	webpackConfigFunctions.push(config.configureWebpack);
+        	delete config.configureWebpack;
+    	}
+
+    	return defaultsDeep(vueConfig, config);
+	},
+
+	loadVueConfig() {
+    	// defaultConfig
+    	const defaultConfig = require('./vue.config.js');
+
+    	// nativeConfig
+    	let nativeConfig={};
+    	if (nativeDirector) {
+        	const nativeConfigPath = path.join(nativeDirector, 'vue.config.js');
+        	nativeConfig = require(nativeConfigPath);
+    	}
+
+    	return utils.mergeVueConfig(defaultConfig, nativeConfig);
+	},
+
+	getAssetPath(filePath) {
+		return vueConfig.assetsDir
+    		? path.posix.join(vueConfig.assetsDir, filePath)
+    		: filePath
+	},
+
+	genTranspileDepRegex (transpileDependencies) {
+		const deps = transpileDependencies.map(dep => {
+			if (typeof dep === 'string') {
+				const depPath = path.join('node_modules', dep, '/')
+				return path.sep==='\\'
+					? depPath.replace(/\\/g, '\\\\') // double escape for windows style path
+					: depPath
+			} else if (dep instanceof RegExp) {
+				return dep.source
+			}
+		})
+		return deps.length ? new RegExp(deps.join('|')) : null
+	}
+}
 
 // vueConfig mapping for webpackConfig
 webpackChainFunctions.push((chainableConfig) => {
     const cwd=process.cwd();
+    const mode = process.env.NODE_ENV || 'production';
+	const isProduction = mode === 'production';
 
     chainableConfig
-        .mode(process.env.NODE_ENV || 'development')
+        .mode(mode)
+		.devtool(vueConfig.productionSourceMap ? 'source-map' : false)
         .context(cwd)
         .when(vueConfig.pages, chainableConfig => {
             Object.keys(vueConfig.pages).forEach(page => {
@@ -26,29 +77,32 @@ webpackChainFunctions.push((chainableConfig) => {
             })
         })
 
+	const jsFilename=`[name]${vueConfig.filenameHashing===false?'':'.[contenthash:8]'}.js`;
     chainableConfig.output
         .path(path.resolve(cwd, vueConfig.outputDir))
-        .filename('[name].[contenthash:8].js')
+        .filename(utils.getAssetPath(jsFilename))
         .publicPath(vueConfig.publicPath)
 
+
     chainableConfig.resolve
+		// import file with ignored extensions
         .extensions
-        .merge(['.mjs', '.js', '.jsx', '.vue', '.json', '.wasm'])
-        .end()
-        //
+        	.merge(['.mjs', '.js', '.jsx', '.vue', '.json', '.wasm'])
+        	.end()
+        // import path from
         .modules
-        .add(path.join(__dirname, 'node_modules'))
-        .add(path.join(cwd, 'node_modules'))
-        .when(nativeDirector, (mod) => {
-            mod.add(path.join(nativeDirector, 'node_modules'))
-        })
+        	.add(path.join(__dirname, 'node_modules'))
+        	.add(path.join(cwd, 'node_modules'))
+        	.when(nativeDirector, (mod) => {
+            	mod.add(path.join(nativeDirector, 'node_modules'))
+        	})
 
         .end()
-        //
+        // import alias
         .alias
-        .set('@', path.join(cwd, 'src'))
-        .set('native', path.join(cwd, 'src'))
-
+        	.set('@', path.join(cwd, 'src'))
+        	.set('native', path.join(cwd, 'src'))
+	// loader path from
     chainableConfig.resolveLoader
         .modules
         .add(path.join(__dirname, 'node_modules'))
@@ -57,46 +111,116 @@ webpackChainFunctions.push((chainableConfig) => {
             mod.add(path.join(nativeDirector, 'node_modules'))
         })
 
+	// vue-loader
     chainableConfig.module
         .rule('vue')
-        .test(/\.vue$/)
-        .use('core-loader')
-        .loader(require.resolve('@cpm/core-loader'))
+			.test(/\.vue$/)
+			.use('core-loader')
+				.loader('./lib/loader')
 
+	// js-loader
+	const transpileDepRegex = utils.genTranspileDepRegex(vueConfig.transpileDependencies);
+	chainableConfig.module
+		.rule('js')
+		.test(/\.m?jsx?$/)
+		.exclude
+			.add(filepath => {
+				// check if this is something the user explicitly wants to transpile
+				if (transpileDepRegex && transpileDepRegex.test(filepath)) {
+					return false
+				}
+				// Don't transpile node_modules
+				return /node_modules/.test(filepath)
+			})
+			.end()
+		.use('babel-loader')
+			.loader('babel-loader')
+
+		.when(process.env.NODE_ENV === 'production' &&
+			!!vueConfig.parallel, rule=>{
+			rule.use('thread-loader')
+				.loader(require.resolve('thread-loader'))
+				.when(typeof vueConfig.parallel === 'number', loader=> {
+					loader.options({ workers: vueConfig.parallel })
+				})
+		})
+
+	// css-loader
+	chainableConfig.module
+		.rule('css')
+		.test(/\.css$/)
+            .use('css-loader')
+            .loader('./lib/style-loader')
+
+	// less-loader
+	const cssOptions = vueConfig.css.loaderOptions || {};
+	const requireModuleExtension = vueConfig.css.requireModuleExtension || true;
+	const cssSourceMap = vueConfig.css.sourceMap || false;
+	const cssLoaderOptions = cssOptions.css || { sourceMap:cssSourceMap, requireModuleExtension};
+	const lessLoaderOptions = cssOptions.less || {cssSourceMap};
+	chainableConfig.module
+		.rule('css-loader')
+		.test(/\.css$/)
+			.use('style-loader')
+			.loader('./lib/style-loader')
+			.end()
+		.use('css-loader')
+			.loader('css-loader')
+			.options(cssLoaderOptions)
+			.end()
+	chainableConfig.module
+		.rule('less-loader')
+		.test(/\.less$/)
+		.use('style-loader')
+			.loader('./lib/style-loader')
+			.end()
+		.use('css-loader')
+			.loader('css-loader')
+			.options(cssLoaderOptions)
+			.end()
+		.use('less-loader')
+			.loader('less-loader')
+			.options(lessLoaderOptions)
+			.end()
+
+	// eslint-loader
+	const lintOnSave = vueConfig.lintOnSave || true;
+	const allWarnings = lintOnSave === true || lintOnSave === 'warning';
+	const allErrors = lintOnSave === 'error';
+	chainableConfig.module
+		.rule('eslint')
+		.pre()
+		.include
+			.add(path.join(cwd, 'src'))
+			.when(nativeDirector, include=>{
+				include.add(path.join(nativeDirector, 'src'))
+			})
+			.end()
+		.exclude
+			.add(/node_modules/)
+			//.add(path.dirname(require.resolve('@vue/cli-service')))
+			.end()
+		.test(/\.(vue|(j|t)sx?)$/)
+		.use('eslint-loader')
+			.loader(require.resolve('eslint-loader'))
+			.options({
+				extensions: ['.js', '.jsx', '.vue'],
+				//cache: true,
+				//cacheIdentifier,
+				emitWarning: allWarnings,
+				// only emit errors in production mode.
+				emitError: allErrors,
+				formatter: require('eslint-friendly-formatter')
+			})
+
+	// core-plugin
     chainableConfig
-        .plugin('BundleType')
-        .use(require('./lib/plugin'))
+        .plugin('CorePlugin')
+        .use(require('./lib/plugin'), [vueConfig])
 })
 
-function mergeVueConfig(vueConfig, config) {
-    if (config.chainWebpack) {
-        webpackChainFunctions.push(config.chainWebpack);
-        delete config.chainWebpack;
-    }
-    if (config.configureWebpack) {
-        webpackConfigFunctions.push(config.configureWebpack);
-        delete config.configureWebpack;
-    }
-
-    return defaultsDeep(vueConfig, config);
-}
-
-function loadVueConfig() {
-    // defaultConfig
-    const defaultConfig = require('./vue.config.js');
-
-    // nativeConfig
-    let nativeConfig={};
-    if (nativeDirector) {
-        const nativeConfigPath = path.join(nativeDirector, 'vue.config.js');
-        nativeConfig = require(nativeConfigPath);
-    }
-
-    return mergeVueConfig(defaultConfig, nativeConfig);
-}
-
 // vueConfig
-vueConfig=loadVueConfig();
+vueConfig=utils.loadVueConfig();
 
 
 // vueConfig.chainWebpack
@@ -116,22 +240,7 @@ webpackConfigFunctions.forEach(fn => {
     }
 });
 
-function rmdirSync(path) {
-    let files = [];
-    if( fs.existsSync(path) ) {
-        files = fs.readdirSync(path);
-        files.forEach(function(file,index){
-            const curPath = path + "/" + file;
-            if(fs.statSync(curPath).isDirectory()) { // recurse
-                rmdirSync(curPath);
-            } else { // delete file
-                fs.unlinkSync(curPath);
-            }
-        });
-        fs.rmdirSync(path);
-    }
-};
-
-rmdirSync(webpackConfig.output.path);
+// clean output
+fs.removeSync(webpackConfig.output.path);
 
 module.exports=webpackConfig;

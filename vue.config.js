@@ -12,43 +12,33 @@ module.exports={
   pages: {
     app: {
       entry: './src/main.js',
-      filename: '[name].[contenthash:8].js'
+      //filename: '[name].js'
+    },
+    app2: {
+      entry: './src/main2.js',
+      filename: '[name].js'
     }
   },
-
-  // where to put static assets (js/css/img/font/...)
+  // 所有的asset emit前加上此路径，参见utils.getAssetPath()
   assetsDir: '',
 
-  // filename for index.html (relative to outputDir)
-  indexPath: 'index.html',
-
-  // whether filename will contain hash part
+  // 启用该设置所有asset输出都带有[contenthash:8]
   filenameHashing: true,
 
-  // boolean, use full build?
-  runtimeCompiler: false,
-
-  // deps to transpile
+  // exclude不解析的js，默认node_module
   transpileDependencies: [
     /* string or regex */
   ],
 
-  // sourceMap for production build?
-  productionSourceMap: !process.env.VUE_CLI_TEST,
+  // devtool的sourceMap for production build?
+  productionSourceMap: true,
 
   // use thread-loader for babel & TS in production build
   // enabled by default if the machine has more than 1 cores
   parallel: hasMultipleCores(),
 
-
-  // <script type="module" crossorigin="use-credentials">
-  // #1656, #1867, #2025
-  crossorigin: undefined,
-
-  // subresource integrity
-  integrity: false,
-
   css: {
+    // 暂不支持mini-extract-css-plugin
     // extract: true,
     // modules: false,
     // sourceMap: false,
@@ -58,6 +48,7 @@ module.exports={
   // whether to use eslint-loader
   lintOnSave: 'default',
 
+  // 暂不支持devServer
   devServer: {
     /*
     open: process.platform === 'darwin',
