@@ -13,10 +13,6 @@ module.exports={
     app: {
       entry: './src/main.js',
       //filename: '[name].js'
-    },
-    app2: {
-      entry: './src/main2.js',
-      filename: '[name].js'
     }
   },
   // 所有的asset emit前加上此路径，参见utils.getAssetPath()

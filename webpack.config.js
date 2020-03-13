@@ -4,8 +4,10 @@ const merge = require('webpack-merge')
 const Config = require('webpack-chain');
 const defaultsDeep = require('lodash.defaultsdeep')
 
-const nativeType=process.env.CPM_NATIVE_TYPE;
+const nativeType=process.env.CPM_NATIVE_TYPE || 'android';
 const nativeDirector=process.env.CPM_NATIVE_DIRECTOR;
+const contextDirector=process.env.CPM_DIRECTOR || process.cwd();
+const mode = process.env.NODE_ENV || 'production';
 
 const webpackChainFunctions=[];
 const webpackConfigFunctions=[];
@@ -34,7 +36,9 @@ const utils={
     	let nativeConfig={};
     	if (nativeDirector) {
         	const nativeConfigPath = path.join(nativeDirector, 'vue.config.js');
-        	nativeConfig = require(nativeConfigPath);
+        	if (fs.existsSync(nativeConfigPath)) {
+				nativeConfig = require(nativeConfigPath);
+			}
     	}
 
     	return utils.mergeVueConfig(defaultConfig, nativeConfig);
@@ -63,23 +67,25 @@ const utils={
 
 // vueConfig mapping for webpackConfig
 webpackChainFunctions.push((chainableConfig) => {
-    const cwd=process.cwd();
-    const mode = process.env.NODE_ENV || 'production';
 	const isProduction = mode === 'production';
 
     chainableConfig
         .mode(mode)
 		.devtool(vueConfig.productionSourceMap ? 'source-map' : false)
-        .context(cwd)
+        .context(contextDirector)
         .when(vueConfig.pages, chainableConfig => {
             Object.keys(vueConfig.pages).forEach(page => {
-                chainableConfig.entry(page).add(vueConfig.pages[page].entry)
+            	const entryPoint=path.resolve(contextDirector, vueConfig.pages[page].entry);
+                chainableConfig.entry(page).add(entryPoint);
             })
         })
 
 	const jsFilename=`[name]${vueConfig.filenameHashing===false?'':'.[contenthash:8]'}.js`;
+    const ouputPath = nativeDirector?
+		path.resolve(nativeDirector, vueConfig.outputDir)
+		: path.resolve(contextDirector, vueConfig.outputDir);
     chainableConfig.output
-        .path(path.resolve(cwd, vueConfig.outputDir))
+        .path(ouputPath)
         .filename(utils.getAssetPath(jsFilename))
         .publicPath(vueConfig.publicPath)
 
@@ -92,7 +98,7 @@ webpackChainFunctions.push((chainableConfig) => {
         // import path from
         .modules
         	.add(path.join(__dirname, 'node_modules'))
-        	.add(path.join(cwd, 'node_modules'))
+        	.add(path.join(contextDirector, 'node_modules'))
         	.when(nativeDirector, (mod) => {
             	mod.add(path.join(nativeDirector, 'node_modules'))
         	})
@@ -100,23 +106,27 @@ webpackChainFunctions.push((chainableConfig) => {
         .end()
         // import alias
         .alias
-        	.set('@', path.join(cwd, 'src'))
-        	.set('native', path.join(cwd, 'src'))
+        	.set('@', path.join(contextDirector, 'src'))
+			.when(nativeDirector, alia=>{
+				alia.set('native', path.join(nativeDirector, 'src'))
+			})
 	// loader path from
     chainableConfig.resolveLoader
         .modules
         .add(path.join(__dirname, 'node_modules'))
-        .add(path.join(cwd, 'node_modules'))
+        .add(path.join(contextDirector, 'node_modules'))
         .when(nativeDirector, (mod) => {
             mod.add(path.join(nativeDirector, 'node_modules'))
         })
 
 	// vue-loader
+	const coreLoader=path.join(__dirname, './lib/loader');
     chainableConfig.module
+		.noParse(/^(vue|vue-router|vuex|vuex-router-sync)$/)
         .rule('vue')
 			.test(/\.vue$/)
 			.use('core-loader')
-				.loader('./lib/loader')
+				.loader(coreLoader)
 
 	// js-loader
 	const transpileDepRegex = utils.genTranspileDepRegex(vueConfig.transpileDependencies);
@@ -139,18 +149,14 @@ webpackChainFunctions.push((chainableConfig) => {
 		.when(process.env.NODE_ENV === 'production' &&
 			!!vueConfig.parallel, rule=>{
 			rule.use('thread-loader')
-				.loader(require.resolve('thread-loader'))
+				.loader('thread-loader')
 				.when(typeof vueConfig.parallel === 'number', loader=> {
 					loader.options({ workers: vueConfig.parallel })
 				})
 		})
 
-	// css-loader
-	chainableConfig.module
-		.rule('css')
-		.test(/\.css$/)
-            .use('css-loader')
-            .loader('./lib/style-loader')
+	// style-loader
+	const styleLoader=path.join(__dirname, './lib/style-loader');
 
 	// less-loader
 	const cssOptions = vueConfig.css.loaderOptions || {};
@@ -159,20 +165,10 @@ webpackChainFunctions.push((chainableConfig) => {
 	const cssLoaderOptions = cssOptions.css || { sourceMap:cssSourceMap, requireModuleExtension};
 	const lessLoaderOptions = cssOptions.less || {cssSourceMap};
 	chainableConfig.module
-		.rule('css-loader')
-		.test(/\.css$/)
-			.use('style-loader')
-			.loader('./lib/style-loader')
-			.end()
-		.use('css-loader')
-			.loader('css-loader')
-			.options(cssLoaderOptions)
-			.end()
-	chainableConfig.module
 		.rule('less-loader')
 		.test(/\.less$/)
 		.use('style-loader')
-			.loader('./lib/style-loader')
+			.loader(styleLoader)
 			.end()
 		.use('css-loader')
 			.loader('css-loader')
@@ -191,7 +187,7 @@ webpackChainFunctions.push((chainableConfig) => {
 		.rule('eslint')
 		.pre()
 		.include
-			.add(path.join(cwd, 'src'))
+			.add(path.join(contextDirector, 'src'))
 			.when(nativeDirector, include=>{
 				include.add(path.join(nativeDirector, 'src'))
 			})
@@ -242,5 +238,5 @@ webpackConfigFunctions.forEach(fn => {
 
 // clean output
 fs.removeSync(webpackConfig.output.path);
-
+debugger
 module.exports=webpackConfig;

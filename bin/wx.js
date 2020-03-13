@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 const path=require('path');
 const fs=require('fs');
-const platform=require('../lib/platform');
+const platform=require('../lib/command');
 
 const cwd=process.cwd();
 

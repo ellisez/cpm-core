@@ -36,6 +36,7 @@
     "he": "^1.2.0",
     "inject-loader": "^4.0.1",
     "js-beautify": "^1.10.3",
+    "less": "^3.11.1",
     "less-loader": "^5.0.0",
     "loader-utils": "^1.4.0",
     "lodash.defaultsdeep": "^4.6.1",
