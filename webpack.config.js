@@ -7,7 +7,7 @@ const defaultsDeep = require('lodash.defaultsdeep')
 const nativeType=process.env.CPM_NATIVE_TYPE || 'android';
 const nativeDirector=process.env.CPM_NATIVE_DIRECTOR;
 const contextDirector=process.env.CPM_DIRECTOR || process.cwd();
-const mode = process.env.NODE_ENV || 'production';
+const mode = process.env.NODE_ENV || 'development' || 'production';
 
 const webpackChainFunctions=[];
 const webpackConfigFunctions=[];
@@ -89,6 +89,10 @@ webpackChainFunctions.push((chainableConfig) => {
         .filename(utils.getAssetPath(jsFilename))
         .publicPath(vueConfig.publicPath)
 
+	if (nativeType) {
+		const nativeConfigChain=require(`./lib/native/${nativeType}`);
+		nativeConfigChain(chainableConfig, vueConfig, utils);
+	}
 
     chainableConfig.resolve
 		// import file with ignored extensions
@@ -130,7 +134,8 @@ webpackChainFunctions.push((chainableConfig) => {
 
 	// js-loader
 	const transpileDepRegex = utils.genTranspileDepRegex(vueConfig.transpileDependencies);
-	chainableConfig.module
+	const babelPlugin=require('./lib/babel');
+    chainableConfig.module
 		.rule('js')
 		.test(/\.m?jsx?$/)
 		.exclude
@@ -145,6 +150,10 @@ webpackChainFunctions.push((chainableConfig) => {
 			.end()
 		.use('babel-loader')
 			.loader('babel-loader')
+			.options({
+				plugins: [babelPlugin]
+			})
+			.end()
 
 		.when(process.env.NODE_ENV === 'production' &&
 			!!vueConfig.parallel, rule=>{
@@ -178,6 +187,7 @@ webpackChainFunctions.push((chainableConfig) => {
 			.loader('less-loader')
 			.options(lessLoaderOptions)
 			.end()
+
 
 	// eslint-loader
 	const lintOnSave = vueConfig.lintOnSave || true;
@@ -238,5 +248,5 @@ webpackConfigFunctions.forEach(fn => {
 
 // clean output
 fs.removeSync(webpackConfig.output.path);
-debugger
+
 module.exports=webpackConfig;
