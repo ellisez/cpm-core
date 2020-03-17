@@ -219,6 +219,18 @@ webpackChainFunctions.push((chainableConfig) => {
 				formatter: require('eslint-friendly-formatter')
 			})
 
+	// cpm-loader: 继承，依赖关系，探针扫描
+	chainableConfig.module
+		.rule('cpm-loader')
+		.test(/\.(vue|js|css)$/)
+		.use('cpm-loader')
+			.loader('@cpm/loader')
+
+	// cpm-plugin
+	chainableConfig
+		.plugin('CpmPlugin')
+		.use(require('@cpm/loader/lib/plugin'), [vueConfig])
+
 	// core-plugin
     chainableConfig
         .plugin('CorePlugin')
@@ -248,5 +260,7 @@ webpackConfigFunctions.forEach(fn => {
 
 // clean output
 fs.removeSync(webpackConfig.output.path);
+// 全局变量
+global.WebpackConfig=webpackConfig;
 
 module.exports=webpackConfig;
