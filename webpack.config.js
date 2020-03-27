@@ -222,7 +222,7 @@ webpackChainFunctions.push((chainableConfig) => {
 	// cpm-loader: 继承，依赖关系，探针扫描
 	chainableConfig.module
 		.rule('cpm-loader')
-		.test(/\.(vue|js|css)$/)
+		.test(/\.(vue|js|css|less)$/)
 		.use('cpm-loader')
 			.loader('@cpm/loader')
 
@@ -260,7 +260,5 @@ webpackConfigFunctions.forEach(fn => {
 
 // clean output
 fs.removeSync(webpackConfig.output.path);
-// 全局变量
-global.WebpackConfig=webpackConfig;
 
 module.exports=webpackConfig;
