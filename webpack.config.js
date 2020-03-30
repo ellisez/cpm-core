@@ -227,9 +227,9 @@ webpackChainFunctions.push((chainableConfig) => {
 			.loader('@cpm/loader')
 
 	// cpm-plugin
-	chainableConfig
-		.plugin('CpmPlugin')
-		.use(require('@cpm/loader/lib/plugin'), [vueConfig])
+	// chainableConfig
+	// 	.plugin('CpmPlugin')
+	// 	.use(require('@cpm/loader/lib/plugin'), [vueConfig])
 
 	// core-plugin
     chainableConfig
