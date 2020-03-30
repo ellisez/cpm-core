@@ -16,8 +16,7 @@
   "scripts": {
     "build": "webpack"
   },
-  "dependencies": {},
-  "devDependencies": {
+  "dependencies": {
     "@babel/core": "^7.8.7",
     "@cpm/core-loader": "^1.0.0",
     "@cpm/loader": "^2.0.0",
